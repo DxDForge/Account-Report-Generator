@@ -125,6 +125,9 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
   Future<void> _generatePDF() async {
     final pdf = pw.Document();
 
+    // Create a copy of reviews to use in PDF
+    final reviewsCopy = List<CustomerReview>.from(_reviews);
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -209,32 +212,38 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
                 pw.SizedBox(height: 12),
               ],
 
-              // Customer Reviews
-              if (_reviews.isNotEmpty) ...[
+              // Customer Reviews - FIXED VERSION
+              if (reviewsCopy.isNotEmpty) ...[
                 _buildPDFSection('CUSTOMER REVIEWS'),
                 pw.SizedBox(height: 8),
-                ..._reviews.asMap().entries.map((entry) {
-                  final idx = entry.key;
-                  final review = entry.value;
-                  return pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        '${idx + 1}. ${review.customerName} - ${review.item}',
-                        style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
-                      ),
-                      pw.Text(
-                        '   Rating: ${'★' * review.rating}${'☆' * (5 - review.rating)} | ${review.sentiment}',
-                        style: const pw.TextStyle(fontSize: 9),
-                      ),
-                      pw.Text('   ${review.comment}', style: const pw.TextStyle(fontSize: 9)),
-                      pw.SizedBox(height: 4),
-                    ],
+                // Use List.generate instead of map to ensure all reviews are included
+                ...List.generate(reviewsCopy.length, (idx) {
+                  final review = reviewsCopy[idx];
+                  // Simple ASCII representation: [****-] for 4/5 stars
+                  final filledStars = '*' * review.rating;
+                  final emptyStars = '-' * (5 - review.rating);
+                  
+                  return pw.Container(
+                    margin: const pw.EdgeInsets.only(bottom: 6),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          '${idx + 1}. ${review.customerName} - ${review.item}',
+                          style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+                        ),
+                        pw.Text(
+                          '   Rating: [$filledStars$emptyStars] (${review.rating}/5) | ${review.sentiment}',
+                          style: const pw.TextStyle(fontSize: 9),
+                        ),
+                        pw.Text('   ${review.comment}', style: const pw.TextStyle(fontSize: 9)),
+                      ],
+                    ),
                   );
                 }),
                 pw.SizedBox(height: 8),
                 pw.Text(
-                  'Total Reviews: ${_reviews.length} | Avg Rating: ${_reviews.isEmpty ? 0 : (_reviews.map((r) => r.rating).reduce((a, b) => a + b) / _reviews.length).toStringAsFixed(1)}★',
+                  'Total Reviews: ${reviewsCopy.length} | Avg Rating: ${(reviewsCopy.map((r) => r.rating).reduce((a, b) => a + b) / reviewsCopy.length).toStringAsFixed(1)}/5',
                   style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
                 ),
               ],
@@ -415,7 +424,7 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
               _buildSection('Additional Notes'),
               _buildTextField('Notes', _notesController, maxLines: 3, required: false),
 
-              _buildSection('Customer Reviews'),
+              _buildSection('Customer Reviews (${_reviews.length})'),
               ..._reviews.asMap().entries.map((entry) {
                 final idx = entry.key;
                 final review = entry.value;
@@ -438,13 +447,13 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
                         ),
                         TextFormField(
                           initialValue: review.customerName,
-                          decoration: const InputDecoration(labelText: 'Customer Name'),
+                          decoration: const InputDecoration(labelText: 'Customer Name', isDense: true),
                           onChanged: (v) => review.customerName = v,
                         ),
                         const SizedBox(height: 8),
                         TextFormField(
                           initialValue: review.item,
-                          decoration: const InputDecoration(labelText: 'Item/Menu'),
+                          decoration: const InputDecoration(labelText: 'Item/Menu', isDense: true),
                           onChanged: (v) => review.item = v,
                         ),
                         const SizedBox(height: 8),
@@ -456,22 +465,27 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
                                 icon: Icon(
                                   i < review.rating ? Icons.star : Icons.star_border,
                                   color: Colors.amber,
+                                  size: 20,
                                 ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
                                 onPressed: () => setState(() => review.rating = i + 1),
                               );
                             }),
+                            Text(' (${review.rating}/5)'),
                           ],
                         ),
+                        const SizedBox(height: 8),
                         TextFormField(
                           initialValue: review.comment,
-                          decoration: const InputDecoration(labelText: 'Comment'),
+                          decoration: const InputDecoration(labelText: 'Comment', isDense: true),
                           maxLines: 2,
                           onChanged: (v) => review.comment = v,
                         ),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
                           value: review.sentiment,
-                          decoration: const InputDecoration(labelText: 'Sentiment'),
+                          decoration: const InputDecoration(labelText: 'Sentiment', isDense: true),
                           items: ['Positive', 'Neutral', 'Negative'].map((s) {
                             return DropdownMenuItem(value: s, child: Text(s));
                           }).toList(),
@@ -531,6 +545,7 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
           labelText: label,
           prefixText: '৳ ',
           border: const OutlineInputBorder(),
+          isDense: true,
         ),
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         validator: (v) {
@@ -551,6 +566,7 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
+          isDense: true,
         ),
         maxLines: maxLines,
         validator: required ? (v) => v == null || v.isEmpty ? 'Required' : null : null,
